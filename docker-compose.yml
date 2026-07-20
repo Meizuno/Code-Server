@@ -1,0 +1,50 @@
+# Single compose file — the SAME command works identically on the laptop
+# and on the VPS:
+#   docker compose up -d --build
+# (or pull the prebuilt image: docker compose pull && docker compose up -d)
+services:
+  code-server:
+    image: ghcr.io/meizuno/code-server:latest
+    build: .
+    container_name: code-server
+
+    # TRADE-OFF, stated plainly: running dockerd inside a container without
+    # a host runtime like Sysbox requires the OUTER container to be
+    # privileged. The inner daemon being rootless does NOT remove that need —
+    # it only adds defense-in-depth (a breakout from the inner daemon lands
+    # as unprivileged uid 1000, not root). Treat this container as
+    # semi-trusted: gate it behind Cloudflare Access and keep the port on
+    # loopback (both done below / in the README).
+    privileged: true
+
+    # Reduced-privilege alternative for hosts that allow unprivileged userns
+    # nesting: comment out `privileged: true` above and uncomment the block
+    # below. FRAGILE and host-dependent — breaks on kernels/distros that
+    # restrict unprivileged user namespaces or need extra masked paths;
+    # verify all acceptance checks after switching.
+    # security_opt:
+    #   - seccomp=unconfined
+    #   - apparmor=unconfined
+    #   - systempaths=unconfined
+    # cap_add:
+    #   - SYS_ADMIN
+    # devices:
+    #   - /dev/fuse   # fuse-overlayfs needs it (privileged mode exposes it implicitly)
+
+    ports:
+      # Loopback only. On the server, cloudflared (on the host) is the sole
+      # ingress and points at http://localhost:8080.
+      - "127.0.0.1:8080:8080"
+    volumes:
+      # Code, VS Code settings/extensions, AND the rootless daemon's image
+      # store (~/.local/share/docker) — one volume persists everything.
+      - coder-home:/home/coder
+    deploy:
+      resources:
+        limits:
+          cpus: "3"
+          memory: 6g
+    restart: unless-stopped
+
+volumes:
+  coder-home:

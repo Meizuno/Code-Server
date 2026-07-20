@@ -1,0 +1,6 @@
+# Shell scripts are executed inside a Linux image — they must stay LF even
+# when the repo is checked out on Windows.
+* text=auto
+*.sh text eol=lf
+Dockerfile text eol=lf
+*.yml text eol=lf

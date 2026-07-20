@@ -1,0 +1,7 @@
+# Secrets live only in .env — never in git.
+.env
+.env.local
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
