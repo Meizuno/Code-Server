@@ -1,5 +1,10 @@
 # Code-Server — VS Code in the browser + rootless Docker-in-Docker
 
+<p align="center">
+  <img src="preview/demo.gif" alt="Code-Server demo — editing in the browser, then the in-container Docker daemon and running the service" width="760"><br>
+  <sub>▶ <a href="preview/demo.mp4">full-resolution MP4</a></sub>
+</p>
+
 VS Code in the browser ([code-server](https://github.com/coder/code-server)) with an inner **rootless** Docker daemon, so you can build images and run devcontainers inside it without touching the host Docker or the production stack on the same VPS.
 
 One image, built by GitHub Actions, pushed to GHCR (`ghcr.io/meizuno/code-server`), and run with **one identical command** on the laptop and on the VPS — no host runtime to install.
