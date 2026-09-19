@@ -46,6 +46,11 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
 COPY entrypoint.sh /usr/local/bin/entrypoint-dind.sh
 RUN chmod +x /usr/local/bin/entrypoint-dind.sh
 
+# Environment description for the Claude Code extension. Baked in here; the
+# entrypoint copies it to /home/coder/CLAUDE.md on start so it stays current
+# past the persistent coder-home volume.
+COPY CLAUDE.md /opt/meizuno/CLAUDE.md
+
 # Everything — code-server AND dockerd — runs as coder (uid 1000).
 USER coder
 

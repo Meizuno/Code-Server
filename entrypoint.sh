@@ -35,6 +35,12 @@ until docker info >/dev/null 2>&1; do
 done
 echo "Inner rootless Docker daemon is ready."
 
+# Refresh the environment CLAUDE.md so the Claude Code extension always sees the
+# current description of this box. Copied on every start so image updates
+# propagate past the persistent coder-home volume; the source of truth is the
+# Code-Server repo, not this installed copy.
+cp -f /opt/meizuno/CLAUDE.md "${HOME:-/home/coder}/CLAUDE.md" 2>/dev/null || true
+
 # Hand off to code-server's normal entrypoint (fixuid + code-server), bound
 # to all interfaces of the container; publishing to the host is restricted
 # to 127.0.0.1 in docker-compose.yml. Built-in auth is disabled — access

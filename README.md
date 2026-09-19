@@ -92,6 +92,16 @@ Inner build layers accumulate in `~/.local/share/docker` on the `coder-home` vol
 docker image prune -f        # and occasionally: docker system prune
 ```
 
+## AI assistant context (CLAUDE.md)
+
+`CLAUDE.md` describes this environment for the **Claude Code** extension — what's
+installed, the inner rootless Docker, the proxy, and the Meizuno ecosystem. It's
+baked into the image (`/opt/meizuno/CLAUDE.md`) and the entrypoint copies it to
+`/home/coder/CLAUDE.md` on every start, so it sits above every cloned project and
+stays current past the `coder-home` volume. Edit the copy in this repo, not the
+installed one (it's overwritten on restart). Individual projects keep their own
+`CLAUDE.md`.
+
 ## CI / image publishing
 
 `.github/workflows/build.yml` builds on every push to `main` and on `v*.*.*` tags, pushing to `ghcr.io/meizuno/code-server` with tags `latest`, `sha-<short-sha>`, and semver (`1.2.3`, `1.2`) on releases. Auth uses the built-in `GITHUB_TOKEN`; the buildx GHA cache keeps rebuilds fast.
