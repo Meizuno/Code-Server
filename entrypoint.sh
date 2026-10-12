@@ -10,6 +10,16 @@ export DOCKER_HOST=unix:///run/user/1000/docker.sock
 # /run is a root-owned tmpfs, so the per-user runtime dir cannot be baked
 # into the image; create it at startup (0700, owned by coder, per the XDG
 # spec). coder has passwordless sudo in the codercom/code-server base image.
+#
+# /run is NOT a tmpfs in a plain container, so the runtime dir survives a
+# container restart (restart policy, `docker compose restart`). Stale pid
+# files left there (docker.pid, docker/containerd/containerd.pid) then point
+# at PIDs that the new container reuses for unrelated processes; dockerd
+# believes containerd is still running, waits for a socket that never
+# appears, and dies with "timeout waiting for containerd to start". Nothing
+# is running yet at this point, so wipe it. (Images/volumes live in
+# ~/.local/share/docker on the persistent volume, not here.)
+sudo rm -rf "$XDG_RUNTIME_DIR"
 sudo install -d -m 0700 -o coder -g coder "$XDG_RUNTIME_DIR"
 
 # Launch the rootless daemon (rootlesskit + dockerd as coder, slirp4netns
