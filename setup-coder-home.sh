@@ -18,7 +18,12 @@ set -euo pipefail
 SIZE="${SIZE:-25G}"
 IMG="${IMG:-/var/lib/coder-home.img}"
 MNT="${MNT:-/srv/coder-home}"
-OLD_VOLUME="${OLD_VOLUME:-coder-home}"
+# Compose prefixes volume names with the project (directory) name, so the real
+# volume is code-server_coder-home, not coder-home — `docker volume rm
+# coder-home` just answers "no such volume". Find it instead of assuming, and
+# still allow an override.
+OLD_VOLUME="${OLD_VOLUME:-$(docker volume ls --format '{{.Name}}' 2>/dev/null \
+  | grep -E '(^|_)coder-home$' | head -n1)}"
 
 [ "$(id -u)" -eq 0 ] || { echo "✗ run as root (sudo $0)" >&2; exit 1; }
 
@@ -87,7 +92,7 @@ Two steps left, in this order:
   1. Remove the OLD volume — compose refuses to reuse a volume whose options
      changed, so \`up -d\` fails until it is gone. The data has been copied to
      $MNT above; verify that first, this is irreversible:
-       docker volume rm $OLD_VOLUME
+       docker volume rm ${OLD_VOLUME:-<none found>}
 
   2. Start the sandbox against the capped filesystem:
        docker compose up -d

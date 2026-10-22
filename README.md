@@ -108,14 +108,31 @@ on ext4, so the cap is the **filesystem underneath**: a fixed-size ext4 image,
 loop-mounted at `/srv/coder-home`, which the `coder-home` volume binds to. At
 the ceiling the sandbox gets `ENOSPC`; the host and production are unaffected.
 
-Set it up once, on the host, with the container stopped:
+Set it up once, on the host, with the container stopped. Note that the deploy
+directory is not necessarily a clone of this repo — on the VPS it holds only a
+copy of the compose file — so fetch the script rather than assuming `git pull`
+works there:
 
 ```bash
+cd ~/servers/code-server            # wherever docker-compose.yml lives
 docker compose down
+
+tmp=$(mktemp -d)
+git clone --depth 1 https://github.com/Meizuno/Code-Server.git "$tmp"
+cp "$tmp/docker-compose.yml" "$tmp/setup-coder-home.sh" .
+chmod +x setup-coder-home.sh
+
 sudo ./setup-coder-home.sh          # 25G; SIZE=40G ./setup-coder-home.sh for more
-docker volume rm coder-home         # the old uncapped volume — data was copied first
+docker volume rm code-server_coder-home   # see below — the name is prefixed
 docker compose up -d
 ```
+
+**The old volume's name carries the compose project prefix**, so it is
+`code-server_coder-home`, not `coder-home`; `docker volume rm coder-home` just
+answers `no such volume`. The script detects the real name itself and prints the
+exact command to run, so take it from the script's output rather than typing it.
+Keep the directory name as it is — the project name is derived from it, and
+changing it would point compose at a different volume entirely.
 
 The script is re-runnable, creates the image sparse (host space is consumed only
 as it is used), mounts it with `discard` so deletions inside shrink it back, and
