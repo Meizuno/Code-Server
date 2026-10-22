@@ -24,6 +24,7 @@ One image, built by GitHub Actions, pushed to GHCR (`ghcr.io/meizuno/code-server
 
 - Everything you run day-to-day — code-server, builds, devcontainers — executes as **unprivileged uid 1000**, never as root. An escape from the *inner* daemon or a devcontainer lands as a nobody-grade user inside the outer container, not root.
 - The inner daemon has its own image store, network and containers — nothing inside it can see or manage the host Docker or the production stack through normal means (no host socket is mounted, `docker ps` inside shows only inner containers).
+- That isolation covers the INNER daemon, not the outer container's network. The outer container joins `meizuno_tunnel` so cloudflared can reach it, and anything else on a network it joins is reachable from a shell in here, Cloudflare Access notwithstanding — Access guards the edge, not container-to-container traffic. That is exactly why this project is on a dedicated tunnel network and **not** on `meizuno_edge`: on edge, `curl http://grafana:3000/api/datasources` from this container answers in full, because Grafana deliberately runs with anonymous admin behind Access. Treat every network you attach here as granting that level of reach.
 - Exposure is minimized: the port is bound to `127.0.0.1` on the host, and ingress goes through Cloudflare Access. Note that code-server itself runs with `--auth none`, so Access (remote) and loopback-only publishing (local) are the entire access control — there is no password fallback.
 
 **If hard host-level isolation from the production stack is the priority**, this is not the strongest option — use [Sysbox](https://github.com/nestybox/sysbox) (unprivileged outer container, host-installed runtime) or a separate VM instead. This repo deliberately trades that for zero host prerequisites and identical local/server behavior.
@@ -50,10 +51,23 @@ Do **not** create a new tunnel. Add an ingress rule to the host's existing tunne
 
 ```yaml
 ingress:
+  # Only correct when cloudflared runs ON THE HOST (a package/service), where
+  # localhost really is the host and the loopback-published port is reachable.
   - hostname: code.<mydomain>
     service: http://localhost:8080
   # ...existing rules...
   - service: http_status:404
+```
+
+If `cloudflared` runs as a **container** — as it does in the Meizuno stack —
+`http://localhost:8080` is cloudflared's own loopback and never reaches the
+host's published port, so the hostname just fails. Point it at the container
+name instead and let the two share the `meizuno_tunnel` network (declared in
+this repo's `docker-compose.yml` and created by the production stack):
+
+```yaml
+  - hostname: code.<mydomain>
+    service: http://code-server:8080
 ```
 
 Then restart cloudflared (`sudo systemctl restart cloudflared`) and, if the tunnel is CLI-managed, add the DNS route: `cloudflared tunnel route dns <tunnel> code.<mydomain>`.

@@ -33,11 +33,18 @@ conventions — read that when working in a project; this is the surroundings.
   `buildx`, `compose`) just works — `DOCKER_HOST=unix:///run/user/1000/docker.sock`
   is already set. You can **build images, run containers, and run devcontainers**.
 - Everything you run executes as **uid 1000** — never root on the host.
-- **Isolation:** this daemon has its own images/networks/containers. It
-  **cannot see or touch the host Docker or the production Meizuno stack** — no
-  host socket is mounted, `docker ps` shows only inner containers. Don't try to
-  reach prod services or the prod Postgres from here; they're not on this
-  daemon's networks.
+- **Isolation (read the limit carefully):** the INNER daemon has its own
+  images/networks/containers and **cannot see or touch the host Docker or the
+  production stack** — no host socket is mounted, `docker ps` shows only inner
+  containers, and containers you start here are not on any prod network.
+- **The OUTER container is a different matter.** It joins `meizuno_tunnel` so
+  that cloudflared (itself a container, so it cannot use the host's loopback)
+  can reach code-server by name. Whatever networks the outer container is on
+  are reachable from a shell in here — Cloudflare Access gates the edge, never
+  container-to-container traffic. So do not attach this box to
+  `meizuno_edge`: that reaches Traefik, every app, and a Grafana running with
+  anonymous admin, straight past Access. Prod Postgres and Redis stay out of
+  reach either way — they are on `internal`.
 - Inner images persist (`~/.local/share/docker` on the volume). Prune when disk
   grows: `docker image prune -f` (occasionally `docker system prune`).
 - Rootless caveat: things needing host devices, `--privileged`, or host

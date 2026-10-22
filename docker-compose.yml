@@ -32,9 +32,25 @@ services:
     #   - /dev/fuse   # fuse-overlayfs needs it (privileged mode exposes it implicitly)
 
     ports:
-      # Loopback only. On the server, cloudflared (on the host) is the sole
-      # ingress and points at http://localhost:8080.
+      # Loopback only — this is how you reach it on a LAPTOP
+      # (http://localhost:8080). On the server it is NOT the ingress path:
+      # cloudflared runs as a container, so a tunnel hostname of
+      # http://localhost:8080 resolves to cloudflared's own loopback and never
+      # reaches the host's published port. The tunnel uses the shared network
+      # below instead.
       - "127.0.0.1:8080:8080"
+    networks:
+      # Own bridge, for egress: image pulls, git, npm.
+      - default
+      # Shared with cloudflared ONLY, so the tunnel can resolve this container
+      # by name (point code.<domain> at http://code-server:8080).
+      #
+      # Deliberately NOT meizuno_edge. Attaching the sandbox to edge also gives
+      # it Traefik, every application container, and a Grafana that runs with
+      # anonymous admin and no login — reachable directly, which walks straight
+      # around the Cloudflare Access policy in front of them. This network
+      # carries cloudflared and nothing else.
+      - tunnel
     volumes:
       # Code, VS Code settings/extensions, AND the rootless daemon's image
       # store (~/.local/share/docker) — one volume persists everything.
@@ -47,6 +63,16 @@ services:
           # NOTE: compose has no disk limit. The ceiling is the filesystem
           # under the volume — see `volumes:` below.
     restart: unless-stopped
+
+networks:
+  # Created by the production stack (compose.infra.yaml in the Infrastructure
+  # repo), which is why it is external here: bring that up first, or this
+  # project fails with "network meizuno_tunnel declared as external, but could
+  # not be found". On a laptop with no production stack, delete the `tunnel`
+  # entries above and reach code-server on 127.0.0.1:8080.
+  tunnel:
+    name: meizuno_tunnel
+    external: true
 
 volumes:
   # DISK CEILING. Docker's local driver cannot cap a volume's size on ext4, so
