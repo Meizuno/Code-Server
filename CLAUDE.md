@@ -21,7 +21,11 @@ conventions — read that when working in a project; this is the surroundings.
 - Everything under **`/home/coder` persists** on the `coder-home` volume — your
   code, VS Code settings/extensions, and the inner Docker image store. Container
   re-creates don't lose it.
-- Resource ceiling: **3 CPUs / 6 GB RAM**.
+- Resource ceiling: **3 CPUs / 6 GB RAM / 25 GB disk**. The disk cap is real:
+  `/home/coder` is a fixed-size ext4 image loop-mounted on the host, so filling
+  it gives you **ENOSPC**, not a full host. The production stack shares the same
+  physical disk — that is why the cap exists. When builds fail with "no space
+  left on device", prune (below) rather than assuming the host is out of room.
 
 ## Docker works here — but it's the INNER rootless daemon
 

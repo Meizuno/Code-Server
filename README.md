@@ -92,6 +92,55 @@ Inner build layers accumulate in `~/.local/share/docker` on the `coder-home` vol
 docker image prune -f        # and occasionally: docker system prune
 ```
 
+`docker image prune -f` only removes **dangling** images. Images that are tagged
+but unused are not touched and are usually the bulk of it — `docker system df`
+shows them as reclaimable. `docker image prune -af` takes those too, at the cost
+of re-pulling.
+
+### Disk ceiling (25 GB, enforced)
+
+The sandbox cannot grow past **25 GB**. It once reached 19 GB — 16 of them the
+inner image store — on a 99 GB disk it shares with the production stack, which
+is the problem this solves.
+
+Compose has no disk limit and Docker's local volume driver cannot cap a volume
+on ext4, so the cap is the **filesystem underneath**: a fixed-size ext4 image,
+loop-mounted at `/srv/coder-home`, which the `coder-home` volume binds to. At
+the ceiling the sandbox gets `ENOSPC`; the host and production are unaffected.
+
+Set it up once, on the host, with the container stopped:
+
+```bash
+docker compose down
+sudo ./setup-coder-home.sh          # 25G; SIZE=40G ./setup-coder-home.sh for more
+docker volume rm coder-home         # the old uncapped volume — data was copied first
+docker compose up -d
+```
+
+The script is re-runnable, creates the image sparse (host space is consumed only
+as it is used), mounts it with `discard` so deletions inside shrink it back, and
+adds an `/etc/fstab` entry with `nofail`. Removing the old volume is required,
+not optional: compose refuses to reuse a volume whose options changed, so
+`up -d` fails until it is gone.
+
+Check the ceiling is live — this should report 25G, not the host disk:
+
+```bash
+docker compose exec code-server df -h /home/coder
+```
+
+The failure mode is silent and worth knowing: if `/srv/coder-home` is not
+mounted, the bind volume falls back to the bare directory on the host root and
+the cap disappears without any error. `entrypoint.sh` warns in the container log
+when `/home/coder` looks host-sized, which is the signal that the mount is gone.
+
+To resize, stop the container and grow both the image and the filesystem:
+
+```bash
+truncate -s 40G /var/lib/coder-home.img
+e2fsck -f /var/lib/coder-home.img && resize2fs /var/lib/coder-home.img
+```
+
 ## AI assistant context (CLAUDE.md)
 
 `CLAUDE.md` describes this environment for the **Claude Code** extension — what's

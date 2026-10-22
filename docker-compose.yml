@@ -44,7 +44,29 @@ services:
         limits:
           cpus: "3"
           memory: 6g
+          # NOTE: compose has no disk limit. The ceiling is the filesystem
+          # under the volume — see `volumes:` below.
     restart: unless-stopped
 
 volumes:
+  # DISK CEILING. Docker's local driver cannot cap a volume's size on ext4, so
+  # the cap is the filesystem itself: a fixed-size ext4 image, loop-mounted at
+  # /srv/coder-home, which this volume binds to. The sandbox then physically
+  # cannot exceed it — it gets ENOSPC while the host (and the production stack
+  # sharing the same disk) carries on untouched. Inner build layers and images
+  # had grown to 19 GB on a 99 GB disk shared with production before this.
+  #
+  # Create the backing filesystem ONCE with ./setup-coder-home.sh (it also
+  # migrates an existing coder-home volume and adds the fstab entry). Without
+  # it, `docker compose up` fails because /srv/coder-home does not exist —
+  # deliberately loud rather than silently uncapped.
+  #
+  # Resize later: stop the container, then
+  #   truncate -s 40G /var/lib/coder-home.img && e2fsck -f /var/lib/coder-home.img
+  #   resize2fs /var/lib/coder-home.img
   coder-home:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /srv/coder-home

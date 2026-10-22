@@ -45,6 +45,18 @@ until docker info >/dev/null 2>&1; do
 done
 echo "Inner rootless Docker daemon is ready."
 
+# Guard the disk ceiling. /home/coder is meant to be a fixed-size ext4 image
+# loop-mounted on the host (see setup-coder-home.sh). The failure mode is
+# silent: if that mount is missing, docker's bind volume falls back to the bare
+# directory on the HOST ROOT filesystem, the cap quietly disappears, and the
+# sandbox can fill the disk production shares. Same size as the host disk means
+# exactly that, so say so loudly rather than discovering it at 95% full.
+home_fs_gb=$(df -BG --output=size /home/coder 2>/dev/null | tail -1 | tr -dc '0-9' || echo 0)
+if [ "${home_fs_gb:-0}" -gt 60 ]; then
+  echo "WARNING: /home/coder sits on a ${home_fs_gb}G filesystem — the disk cap is NOT in effect." >&2
+  echo "WARNING: /srv/coder-home is probably not mounted on the host; see setup-coder-home.sh." >&2
+fi
+
 # Refresh the environment CLAUDE.md so the Claude Code extension always sees the
 # current description of this box. Copied on every start so image updates
 # propagate past the persistent coder-home volume; the source of truth is the
